@@ -1,8 +1,63 @@
-# use PHP 8.2
-FROM php:8.2-fpm
+# # use PHP 8.2
+# FROM php:8.2-fpm
 
-# Copy composer.lock and composer.json
-COPY composer.lock composer.json /var/www/
+# # Copy composer.lock and composer.json
+# COPY composer.lock composer.json /var/www/
+
+# # Set working directory
+# WORKDIR /var/www
+
+# # Install dependencies
+# RUN apt-get update && apt-get install -y \
+#     build-essential \
+#     libpng-dev \
+#     libjpeg62-turbo-dev \
+#     libfreetype6-dev \
+#     locales \
+#     zip \
+#     jpegoptim optipng pngquant gifsicle \
+#     vim \
+#     unzip \
+#     git \
+#     curl \
+#     libonig-dev \
+#     libzip-dev \
+#     libgd-dev
+# # Clear cache
+# RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# #Mine
+
+# # Install extensions
+# RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
+# RUN docker-php-ext-configure gd --with-external-gd
+# RUN docker-php-ext-install gd
+
+# # Install composer
+# RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# # Add user for laravel application
+# RUN groupadd -g 1000 www
+# RUN useradd -u 1000 -ms /bin/bash -g www www
+
+# # Copy existing application directory contents
+# COPY . /var/www
+
+# # Copy existing application directory permissions
+# COPY --chown=www:www . /var/www
+# RUN chown -R www-data:www-data /var/www \
+#     && chmod -R 775 /var/www/storage \
+#     && chmod -R 775 /var/www/storage/framework/sessions \
+#     && chmod -R 775 /var/www/storage/framework/views
+
+# # Change current user to www
+# USER www
+
+# # Expose port 9000 and start php-fpm server
+# EXPOSE 9000
+# ENTRYPOINT [ "sh", "entrypoint.sh" ]
+
+# Gunakan PHP 8.2 dengan FPM
+FROM php:8.2-fpm
 
 # Set working directory
 WORKDIR /var/www
@@ -22,36 +77,48 @@ RUN apt-get update && apt-get install -y \
     curl \
     libonig-dev \
     libzip-dev \
-    libgd-dev
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-#Mine
+    libgd-dev \
+    nodejs \
+    npm \
+    mariadb-client \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install extensions
+# Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring zip exif pcntl
 RUN docker-php-ext-configure gd --with-external-gd
 RUN docker-php-ext-install gd
 
-# Install composer
+# Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Add user for laravel application
-RUN groupadd -g 1000 www
-RUN useradd -u 1000 -ms /bin/bash -g www www
+# Tambahkan user untuk Laravel
+RUN groupadd -g 1000 www \
+    && useradd -u 1000 -ms /bin/bash -g www www
 
-# Copy existing application directory contents
+# Copy file composer.json dan lock untuk meng-cache dependensi
+COPY composer.json composer.lock /var/www/
+
+# Install dependensi Laravel sebelum menyalin kode agar cache bisa dimanfaatkan
+RUN composer install --no-dev --optimize-autoloader --no-progress --no-interaction
+
+# Copy kode proyek Laravel ke dalam container
 COPY . /var/www
 
-# Copy existing application directory permissions
-COPY --chown=www:www . /var/www
+# Atur permission untuk storage dan bootstrap/cache
 RUN chown -R www-data:www-data /var/www \
-    && chmod -R 775 /var/www/storage \
-    && chmod -R 775 /var/www/storage/framework/sessions \
-    && chmod -R 775 /var/www/storage/framework/views
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache \
+    && chmod -R 775 /var/www/storage/framework/{cache,sessions,views} \
+    && chown -R www-data:www-data /var/www/vendor
 
-# Change current user to www
-USER www
+# Salin entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Expose port 9000 and start php-fpm server
+# Ubah user menjadi www-data untuk menjalankan Laravel
+USER www-data
+
+# Expose port 9000 untuk PHP-FPM
 EXPOSE 9000
-ENTRYPOINT [ "sh", "entrypoint.sh" ]
+
+# Gunakan entrypoint untuk menjalankan Laravel sebelum PHP-FPM
+ENTRYPOINT ["/entrypoint.sh"]
