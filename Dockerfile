@@ -98,11 +98,11 @@ RUN groupadd -g 1000 www \
 # Copy file composer.json dan lock untuk meng-cache dependensi
 COPY composer.json composer.lock /var/www/
 
-# Install dependensi Laravel sebelum menyalin kode agar cache bisa dimanfaatkan
-RUN composer install --no-dev --optimize-autoloader --no-progress --no-interaction
-
 # Copy kode proyek Laravel ke dalam container
 COPY . /var/www
+
+# Install dependensi Laravel sebelum menyalin kode agar cache bisa dimanfaatkan
+RUN composer install --no-dev --optimize-autoloader --no-progress --no-interaction
 
 # Atur permission untuk storage dan bootstrap/cache
 RUN chown -R www-data:www-data /var/www \
